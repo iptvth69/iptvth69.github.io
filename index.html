@@ -1,5 +1,409 @@
-<!DOCTYPE html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>IPTV</title><script src='https://cdn.jsdelivr.net/npm/hls.js@latest'></script><style>body{margin:0;background:#111;color:#fff;font-family:Arial;display:flex;flex-direction:column;height:100vh}header{padding:12px;text-align:center;background:#1b1b1b;font-size:24px}#wrap{flex:1;display:flex;justify-content:center;align-items:center}video{width:min(95vw,1000px);max-height:60vh;background:#000;border-radius:10px}#channels{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:10px;padding:10px;overflow:auto;max-height:35vh}.card{background:#222;padding:8px;border-radius:10px;text-align:center;cursor:pointer}.card:hover{background:#333}.card img{width:64px;height:64px;object-fit:contain;background:#fff;border-radius:8px}.name{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}</style></head><body><header>IPTV PLAYER</header><div id='wrap'><video id='video' controls autoplay></video></div><div id='channels'></div><script>
-const v=document.getElementById('video');
-function play(u){if(Hls.isSupported()&&u.includes('.m3u8')){if(window.hls)window.hls.destroy();window.hls=new Hls();hls.loadSource(u);hls.attachMedia(v);hls.on(Hls.Events.MANIFEST_PARSED,()=>v.play())}else{if(window.hls)window.hls.destroy();v.src=u;v.play()}localStorage.last=u;}
-fetch('iptv.m3u').then(r=>r.text()).then(t=>{let a=t.split(/\r?\n/),chs=[],m=null;a.forEach(l=>{if(l.startsWith('#EXTINF')){let n=l.split(',').pop().trim();let x=l.match(/tvg-logo="([^"]*)"/);m={name:n,logo:x?x[1]:''}}else if(m&&l&&!l.startsWith('#')){m.url=l.trim();chs.push(m);m=null;}});let c=document.getElementById('channels');chs.forEach(ch=>{let d=document.createElement('div');d.className='card';d.innerHTML='<img loading="lazy" src="'+(ch.logo||'https://via.placeholder.com/64?text=TV')+'"><div class=name>'+ch.name+'</div>';d.onclick=()=>play(ch.url);c.appendChild(d)});if(localStorage.last)play(localStorage.last);else if(chs.length)play(chs[0].url);});
-</script></body></html>
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Thai IPTV Offline Player</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: #0f0f0f;
+      color: #eee;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+    header {
+      text-align: center;
+      padding: 10px 12px;
+      background: #1a1a1a;
+      border-bottom: 1px solid #333;
+      flex-shrink: 0;
+    }
+    header h1 {
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: #fff;
+    }
+    header p {
+      font-size: 0.75rem;
+      color: #aaa;
+      margin-top: 2px;
+    }
+    .player-wrap {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 8px;
+      min-height: 0;
+      background: #000;
+    }
+    .video-container {
+      width: 100%;
+      max-width: 960px;
+      position: relative;
+      background: #000;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    }
+    video {
+      width: 100%;
+      height: auto;
+      display: block;
+      max-height: 55vh;
+      background: #000;
+      aspect-ratio: 16 / 9;
+      object-fit: contain;
+    }
+    .now-playing {
+      text-align: center;
+      padding: 8px 12px;
+      font-size: 0.95rem;
+      color: #4fc3f7;
+      background: #121212;
+      width: 100%;
+      max-width: 960px;
+      border-radius: 0 0 8px 8px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .channels-section {
+      flex-shrink: 0;
+      background: #1a1a1a;
+      border-top: 1px solid #333;
+      padding: 10px 0 14px;
+    }
+    .channels-label {
+      font-size: 0.8rem;
+      color: #888;
+      padding: 0 12px 8px;
+      text-align: center;
+    }
+    .channels {
+      display: flex;
+      gap: 10px;
+      overflow-x: auto;
+      padding: 0 12px 6px;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+    }
+    .channels::-webkit-scrollbar {
+      height: 6px;
+    }
+    .channels::-webkit-scrollbar-track {
+      background: #222;
+      border-radius: 3px;
+    }
+    .channels::-webkit-scrollbar-thumb {
+      background: #555;
+      border-radius: 3px;
+    }
+    .channel {
+      flex: 0 0 auto;
+      width: 88px;
+      scroll-snap-align: start;
+      cursor: pointer;
+      text-align: center;
+      border-radius: 10px;
+      padding: 6px 4px;
+      transition: background 0.15s, transform 0.15s;
+      border: 2px solid transparent;
+    }
+    .channel:hover, .channel:focus {
+      background: #2a2a2a;
+    }
+    .channel.active {
+      background: #1e3a5f;
+      border-color: #4fc3f7;
+    }
+    .channel img {
+      width: 64px;
+      height: 64px;
+      object-fit: contain;
+      border-radius: 8px;
+      background: #222;
+      display: block;
+      margin: 0 auto 4px;
+    }
+    .channel .name {
+      font-size: 0.68rem;
+      line-height: 1.2;
+      color: #ccc;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      max-height: 2.4em;
+    }
+    .channel.active .name {
+      color: #fff;
+    }
+    .status {
+      text-align: center;
+      font-size: 0.8rem;
+      color: #888;
+      padding: 4px;
+      min-height: 1.2em;
+    }
+    .error { color: #f44336; }
+    /* Mobile tweaks */
+    @media (max-width: 600px) {
+      header h1 { font-size: 1rem; }
+      video { max-height: 42vh; }
+      .channel { width: 76px; }
+      .channel img { width: 56px; height: 56px; }
+      .channel .name { font-size: 0.62rem; }
+    }
+    @media (orientation: landscape) and (max-height: 500px) {
+      video { max-height: 60vh; }
+      .channels { padding-bottom: 4px; }
+    }
+  </style>
+  <!-- hls.js for Chrome / Firefox M3U8 support (loaded from CDN when online) -->
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js"></script>
+</head>
+<body>
+  <header>
+    <h1>Thai IPTV Offline Player</h1>
+    <p>คลิกโลโก้ช่องด้านล่างเพื่อเล่น • รองรับ M3U8 (hls.js) / MP4 / MKV / TS</p>
+  </header>
+
+  <div class="player-wrap">
+    <div class="video-container">
+      <video id="player" controls playsinline webkit-playsinline></video>
+    </div>
+    <div class="now-playing" id="nowPlaying">เลือกช่องเพื่อเริ่มเล่น</div>
+    <div class="status" id="status"></div>
+  </div>
+
+  <div class="channels-section">
+    <div class="channels-label">ช่องรายการ (เลื่อนซ้าย-ขวา)</div>
+    <div class="channels" id="channels"></div>
+  </div>
+
+  <script>
+    // Channel list embedded from iptv.m3u
+    const channels = [
+      {"name":"THAI PBS HD","logo":"https://static.wikia.nocookie.net/logopedia/images/b/b5/Thai_PBS_2015.svg","url":"https://thaipbs-ophctt.cdn.byteark.com/live/playlist.m3u8","group":"General"},
+      {"name":"Channel 5 (1080p)","logo":"https://i.imgur.com/wOIaqg7.png","url":"https://639bc5877c5fe.streamlock.net/tv5hdlive/tv5hdlive/playlist.m3u8","group":"General"},
+      {"name":"ONE HD","logo":"https://static.wikia.nocookie.net/logopedia/images/1/1b/GMM_One_2015.png","url":"https://bcovlive-a.akamaihd.net/b6603a14ea59440a95e9235e14bc9332/ap-southeast-1/6415628290001/9c3d7fc7d10840a69e48b5939ae886e0/playlist_ssaiM.m3u8","group":"General"},
+      {"name":"MCOT HD","logo":"https://i.imgur.com/ejPxGmU.png","url":"https://mcothd-streaming-edge-cdn.mcot.net/tencentmcot/smil:tencentmcot.smil/playlist.m3u8","group":"General"},
+      {"name":"NBT HD","logo":"https://upload.wikimedia.org/wikipedia/commons/d/d4/NBT_2025.svg","url":"https://cdn-edge.iiptvcdn.com/live_event/smil:f180-054a-38d7-ce66-f7cf.smil/playlist.m3u8","group":"General"},
+      {"name":"GMM 25","logo":"https://i.imgur.com/uARba6N.png","url":"https://bcovlive-a.akamaihd.net/57d4bf695e80436d9335f4f50adbe438/ap-southeast-1/6415628290001/7e85dc4a59904e45b4fdffebd62e1d82/playlist_ssaiM.m3u8","group":"General"},
+      {"name":"MONO 29 (1080p)","logo":"https://upload.wikimedia.org/wikipedia/commons/d/d5/Mono_29_Logo.png","url":"https://monomax-uiripn.cdn.byteark.com/plain/th/1080p/index.m3u8","group":"Entertainment"},
+      {"name":"TPTV","logo":"https://static.wikia.nocookie.net/logopedia/images/0/0b/TPTV_2014.png","url":"https://tv-live.tpchannel.org/live/tv_360p.m3u8","group":"General"},
+      {"name":"Thai Chaiyo","logo":"https://i.imgur.com/uOfb3y1.png","url":"https://live-iptv.thaichaiyo.tv/tcy/live-720P.m3u8","group":"Music"},
+      {"name":"Channel 8","logo":"https://s2.imgbb.ws/file/storage-sv2/QxK45.png","url":"https://cdn-th-vip.login.in.th:443/ch8/ch8/chunklist.m3u8","group":"Movies"},
+      {"name":"Cable Channel 37","logo":"https://s2.imgbb.ws/file/storage-sv2/QxTAY.png","url":"http://www5.cabletv.co.th/StreamToCTV/cablechannel/playlist.m3u8","group":"Undefined"},
+      {"name":"ASTV News 1","logo":"https://s1.imgbb.ws/file/storage-sv1/QxTFq.jpg","url":"http://news1.live14.com/stream/news1.m3u8","group":"News"},
+      {"name":"Top News","logo":"https://i.imgur.com/tRFnV9M.png","url":"https://live.topnews.co.th/hls/topnews_a_720.m3u8","group":"News"},
+      {"name":"Suwannabhumi Channel","logo":"https://i.imgur.com/6AGKP0A.png","url":"https://live.bangkokstream.com:19360/suwannabhumi/suwannabhumi.m3u8","group":"Undefined"},
+      {"name":"Looktung Network FM 98.5","logo":"https://s1.imgbb.ws/file/storage-sv1/QxK1F.png","url":"http://vip.login.in.th:1935/looktungnetwork1/looktungnetwork1/playlist.m3u8","group":"Music"},
+      {"name":"Thai News","logo":"https://s2.imgbb.ws/file/storage-sv2/QRhlv.jpg","url":"https://live.thaitvstream.com/play/thainews/index.m3u8","group":"News"},
+      {"name":"มวลชนทีวี","logo":"https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTDwCPAkvPcJC3TVCroIIp-RjE3WEszztKAMg&usqp=CAU","url":"https://live2.thaitvstream.com/play/mounchontv/index.m3u8","group":"News"},
+      {"name":"Siam News TV","logo":"https://www.muanchononlinenews.com/wp-content/uploads/2022/09/S__27025565.jpg","url":"https://live1.thaitvstream.com/play/siamnewstv/index.m3u8","group":"News"},
+      {"name":"SBB TV","logo":"https://i.imgur.com/B1tyK1Z.png","url":"https://cdn-th-vip2.livestreaming.in.th/watsanghathan/watsanghathan/playlist.m3u8","group":"Religious"},
+      {"name":"SBT TV","logo":"https://i.imgur.com/rmNDylW.png","url":"http://122.155.12.107:1935/live/sbt_tv_aac_300/playlist.m3u8","group":"Religious"},
+      {"name":"Cool Channel","logo":"https://dl.dropbox.com/s/wgd3zgpi68gasbr/coolchannel.png?dl=0","url":"https://live-iptv.cool-channel.com/cool/live-720P.m3u8","group":"Movies"},
+      {"name":"White Channel","logo":"https://i.imgur.com/Chx0AV9.png","url":"http://symc-cdn.violin.co.th:1935/tndedge/whitechannel/chunklist.m3u8","group":"Religious"},
+      {"name":"Police TV","logo":"https://i.imgur.com/GhboFGt.png","url":"https://cdn-th-vip.livestreaming.in.th/policetv/policetv/playlist.m3u8","group":"Undefined"},
+      {"name":"DOPA Channel","logo":"https://imgur.com/Z9vxti4.png","url":"http://dopachannel.truegse.com/live/dopatv03.m3u8","group":"Undefined"},
+      {"name":"Rama Channel (1080p)","logo":"https://i.imgur.com/pnbzE2V.png","url":"https://ramach.ddns.net/live/ramalive/index.m3u8","group":"Undefined"},
+      {"name":"GBN","logo":"https://gbnus.com/GBN Content/new backgruound/logo-GBN-small1.png","url":"http://us.gbnus.com/live/dhamma_high/playlist.m3u8","group":"Religious"},
+      {"name":"TV Muslim Thailand","logo":"https://i.imgur.com/aCFpuzW.png","url":"https://vdo.plathong.net/tvmuslim/tvmuslim/playlist.m3u8","group":"Religious"},
+      {"name":"DLTV 1","logo":"https://i.imgur.com/nLzdGeX.png","url":"https://cdn-live.dltv.ac.th/dltv01.m3u8","group":"Education"},
+      {"name":"DLTV 2","logo":"https://i.imgur.com/lDBSTfE.png","url":"https://cdn-live.dltv.ac.th/dltv02.m3u8","group":"Education"},
+      {"name":"DLTV 3","logo":"https://i.imgur.com/wmrxerm.png","url":"https://cdn-live.dltv.ac.th/dltv03.m3u8","group":"Education"},
+      {"name":"DLTV 4","logo":"https://i.imgur.com/WkpoQhU.png","url":"https://cdn-live.dltv.ac.th/dltv04.m3u8","group":"Education"},
+      {"name":"DLTV 5","logo":"https://i.imgur.com/J1E89jX.png","url":"https://cdn-live.dltv.ac.th/dltv05.m3u8","group":"Education"},
+      {"name":"DLTV 6","logo":"https://i.imgur.com/qeIHWC0.png","url":"https://cdn-live.dltv.ac.th/dltv06.m3u8","group":"Education"},
+      {"name":"DLTV 7","logo":"https://i.imgur.com/OjYwMe3.png","url":"https://cdn-live.dltv.ac.th/dltv07.m3u8","group":"Education"},
+      {"name":"DLTV 8","logo":"https://i.imgur.com/xIwn5Ha.png","url":"https://cdn-live.dltv.ac.th/dltv08.m3u8","group":"Education"},
+      {"name":"DLTV 9","logo":"https://i.imgur.com/yPeSAry.png","url":"https://cdn-live.dltv.ac.th/dltv09.m3u8","group":"Education"},
+      {"name":"DLTV 10","logo":"https://i.imgur.com/TgN81Zr.png","url":"https://cdn-live.dltv.ac.th/dltv10.m3u8","group":"Education"},
+      {"name":"DLTV 11","logo":"https://i.imgur.com/hFk2b5s.png","url":"https://cdn-live.dltv.ac.th/dltv11.m3u8","group":"Education"},
+      {"name":"DLTV 12","logo":"https://i.imgur.com/ITt6lY7.png","url":"https://cdn-live.dltv.ac.th/dltv12.m3u8","group":"Education"},
+      {"name":"DLTV 13","logo":"https://i.imgur.com/asB5w3v.png","url":"https://cdn-live.dltv.ac.th/dltv13.m3u8","group":"Education"},
+      {"name":"DLTV 14","logo":"https://i.imgur.com/HOjZRNS.png","url":"https://cdn-live.dltv.ac.th/dltv14.m3u8","group":"Education"},
+      {"name":"DLTV 15","logo":"https://i.imgur.com/onJi2b6.png","url":"https://cdn-live.dltv.ac.th/dltv15.m3u8","group":"Education"},
+      {"name":"ETV","logo":"https://i.imgur.com/Dsgpo4I.png","url":"http://150.95.66.20:1935/live/livestream/playlist.m3u8","group":"Education"},
+      {"name":"Home Media Network","logo":"https://s1.imgbb.ws/file/storage-sv1/QNfMe.jpg","url":"http://chanthai.trueddns.com:35603/hls/hmn.m3u8","group":"Eduteanment"},
+      {"name":"13SiamTV","logo":"https://s1.imgbb.ws/file/storage-sv1/maeQC.jpg","url":"https://live.x2.co.th/live/13livetv-th.m3u8","group":"iptv"},
+      {"name":"STOU channel","logo":"https://s2.imgbb.ws/file/storage-sv2/maeGR.png","url":"https://stream1.stou.ac.th/live/stou_720p/playlist.m3u8","group":"iptv"},
+      {"name":"Zee Nung","logo":"https://s1.imgbb.ws/file/storage-sv1/ma1vT.jpg","url":"https://amg17931-zee-amg17931c4-samsung-th-5592.playouts.now.amagi.tv/playlist/amg17931-asiatvusaltdfast-zeenung-samsungth/playlist.m3u8","group":"iptv"},
+      {"name":"Home Media Network","logo":"https://s1.imgbb.ws/file/storage-sv1/9KHt5.jpg","url":"http://chanthai.trueddns.com:35603/hls/hmn.m3u8","group":"Eduteanment"},
+      {"name":"Home Media Network","logo":"https://s2.imgbb.ws/file/storage-sv2/9KHL0.jpg","url":"http://chanthai.trueddns.com:35603/hls/hmr.m3u8","group":"Eduteanment"},
+      {"name":"Home Media Network","logo":"https://s2.imgbb.ws/file/storage-sv2/9KNyr.jpg","url":"http://chanthai.trueddns.com:35603/hls/hmrc.m3u8","group":"Eduteanment"}
+    ];
+
+    const video = document.getElementById('player');
+    const nowPlaying = document.getElementById('nowPlaying');
+    const statusEl = document.getElementById('status');
+    const channelsEl = document.getElementById('channels');
+    let currentIndex = -1;
+    let hls = null; // hls.js instance
+
+    // Fallback logo (simple TV icon as data URI)
+    const fallbackLogo = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect fill='%23333' width='64' height='64' rx='8'/%3E%3Crect fill='%23555' x='10' y='14' width='44' height='28' rx='3'/%3E%3Ccircle fill='%234fc3f7' cx='32' cy='28' r='6'/%3E%3Cpath fill='%23888' d='M22 48h20l-4-6H26z'/%3E%3C/svg%3E";
+
+    function setStatus(msg, isError) {
+      statusEl.textContent = msg || '';
+      statusEl.className = 'status' + (isError ? ' error' : '');
+    }
+
+    function destroyHls() {
+      if (hls) {
+        hls.destroy();
+        hls = null;
+      }
+    }
+
+    function isHlsUrl(url) {
+      if (!url) return false;
+      const u = url.toLowerCase();
+      return u.includes('.m3u8') || u.includes('m3u8') || u.includes('application/vnd.apple.mpegurl');
+    }
+
+    function playChannel(index) {
+      if (index < 0 || index >= channels.length) return;
+      const ch = channels[index];
+      currentIndex = index;
+
+      // Update active UI
+      document.querySelectorAll('.channel').forEach((el, i) => {
+        el.classList.toggle('active', i === index);
+      });
+
+      nowPlaying.textContent = 'กำลังเล่น: ' + ch.name;
+      setStatus('กำลังโหลดสตรีม...');
+
+      // Cleanup previous
+      destroyHls();
+      video.pause();
+      video.removeAttribute('src');
+      video.load();
+
+      const url = ch.url;
+
+      // Prefer hls.js for M3U8 on browsers without native HLS (Chrome, Firefox)
+      if (isHlsUrl(url) && window.Hls && Hls.isSupported()) {
+        hls = new Hls({
+          enableWorker: true,
+          lowLatencyMode: false,
+          backBufferLength: 90
+        });
+        hls.loadSource(url);
+        hls.attachMedia(video);
+        hls.on(Hls.Events.MANIFEST_PARSED, function () {
+          video.play().then(() => {
+            setStatus('กำลังเล่น (hls.js)');
+          }).catch(err => {
+            console.error(err);
+            setStatus('กดปุ่มเล่นบนวิดีโอเพื่อเริ่ม', true);
+          });
+        });
+        hls.on(Hls.Events.ERROR, function (event, data) {
+          if (data.fatal) {
+            console.error('HLS fatal error', data);
+            switch (data.type) {
+              case Hls.ErrorTypes.NETWORK_ERROR:
+                setStatus('เครือข่ายผิดพลาด — ลองใหม่หรือเปลี่ยนช่อง', true);
+                hls.startLoad();
+                break;
+              case Hls.ErrorTypes.MEDIA_ERROR:
+                setStatus('สื่อผิดพลาด — กำลังกู้คืน...', true);
+                hls.recoverMediaError();
+                break;
+              default:
+                setStatus('สตรีมใช้ไม่ได้ (CORS / หมดอายุ / บล็อก)', true);
+                destroyHls();
+                break;
+            }
+          }
+        });
+      } else if (isHlsUrl(url) && video.canPlayType('application/vnd.apple.mpegurl')) {
+        // Native HLS (Safari, iOS, some Edge/Android)
+        video.src = url;
+        video.play().then(() => {
+          setStatus('กำลังเล่น (native HLS)');
+        }).catch(err => {
+          console.error(err);
+          setStatus('กดปุ่มเล่นบนวิดีโอเพื่อเริ่ม', true);
+        });
+      } else {
+        // MP4 / other progressive or native formats
+        video.src = url;
+        video.play().then(() => {
+          setStatus('กำลังเล่น');
+        }).catch(err => {
+          console.error(err);
+          setStatus('เล่นอัตโนมัติไม่ได้ — กดปุ่มเล่น หรือรูปแบบไม่รองรับ', true);
+        });
+      }
+    }
+
+    // Build channel list
+    channels.forEach((ch, index) => {
+      const div = document.createElement('div');
+      div.className = 'channel';
+      div.setAttribute('role', 'button');
+      div.setAttribute('tabindex', '0');
+      div.title = ch.name + (ch.group ? ' (' + ch.group + ')' : '');
+
+      const img = document.createElement('img');
+      img.src = ch.logo || fallbackLogo;
+      img.alt = ch.name;
+      img.loading = 'lazy';
+      img.onerror = function() { this.src = fallbackLogo; };
+
+      const name = document.createElement('div');
+      name.className = 'name';
+      name.textContent = ch.name;
+
+      div.appendChild(img);
+      div.appendChild(name);
+
+      div.addEventListener('click', () => playChannel(index));
+      div.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          playChannel(index);
+        }
+      });
+
+      channelsEl.appendChild(div);
+    });
+
+    // Video events
+    video.addEventListener('playing', () => {
+      if (!statusEl.textContent.includes('hls.js') && !statusEl.textContent.includes('native')) {
+        setStatus('กำลังเล่น');
+      }
+    });
+    video.addEventListener('waiting', () => setStatus('กำลังบัฟเฟอร์...'));
+    video.addEventListener('error', () => {
+      if (!hls) {
+        setStatus('โหลดสตรีมไม่สำเร็จ — อาจถูกบล็อก CORS / หมดอายุ / ไม่รองรับรูปแบบ', true);
+      }
+    });
+    video.addEventListener('stalled', () => setStatus('สัญญาณช้า...'));
+
+    // Keyboard: left/right to change channel
+    document.addEventListener('keydown', (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      if (e.key === 'ArrowRight' && currentIndex < channels.length - 1) {
+        playChannel(currentIndex + 1);
+      } else if (e.key === 'ArrowLeft' && currentIndex > 0) {
+        playChannel(currentIndex - 1);
+      }
+    });
+  </script>
+</body>
+</html>
